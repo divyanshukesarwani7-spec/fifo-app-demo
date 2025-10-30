@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edible Oil FIFO System Demo</title>
+    <!-- PWA Link: This tells the browser where to find the installation instructions. -->
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .nav-link {
+            @apply px-4 py-2 text-gray-700 hover:text-blue-600 hover:bg-gray-100 rounded-md transition-colors cursor-pointer;
+        }
+        .nav-link.active {
+            @apply text-blue-600 font-semibold bg-blue-50;
+        }
+        .card {
+            @apply bg-white shadow-lg rounded-xl p-6 border border-gray-100 h-full;
+        }
+        .btn {
+            @apply px-6 py-3 rounded-lg font-semibold text-white shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+        }
+        .btn-primary {
+            @apply bg-blue-600 hover:bg-blue-700 focus:ring-blue-500;
+        }
+        .btn-secondary {
+            @apply bg-gray-500 hover:bg-gray-600 focus:ring-gray-400;
+        }
+        .btn:disabled {
+            @apply bg-gray-300 cursor-not-allowed shadow-none;
+        }
+    </style>
+</head>
+<body class="bg-stone-50 select-none text-gray-800">
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">Edible Oil FIFO System</h1>
+            <p class="text-xl text-gray-600">Interactive Demo of the Booking & Delivery Process Flow</p>
+        </header>
+
+        <nav class="flex items-center space-x-2 bg-white p-2 rounded-lg shadow-sm border border-gray-200 mb-8">
+            <a id="nav-demo" class="nav-link active">Interactive FIFO Demo</a>
+            <a id="nav-setup" class="nav-link">System Setup</a>
+            <a id="nav-reporting" class="nav-link">Reporting & Audit</a>
+        </nav>
+
+        <main>
+            <section id="page-demo">
+                <div class="mb-6">
+                    <h2 class="text-3xl font-semibold mb-2">Interactive FIFO Demo</h2>
+                    <p class="text-lg text-gray-700">This simulation walks you through the FIFO logic described in your report. Click the "Simulate" buttons to see the system automatically process deliveries against the oldest bookings first. Watch how the "Booking Ledger" and "Booking Status Chart" update in real-time.</p>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    
+                    <div class="space-y-6">
+                        <div class="card">
+                            <h3 class="text-2xl font-semibold mb-4">Controls</h3>
+                            <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                                <button id="btn-delivery-1" class="btn btn-primary w-full sm:w-auto">Simulate Delivery 1 (50 units)</button>
+                                <button id="btn-delivery-2" class="btn btn-primary w-full sm:w-auto" disabled>Simulate Delivery 2 (150 units)</button>
+                                <button id="btn-reset" class="btn btn-secondary w-full sm:w-auto">Reset Demo</button>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3 class="text-2xl font-semibold mb-4">System Output: Invoice</h3>
+                            <p id="invoice-placeholder" class="text-gray-500">Invoice details will appear here after a delivery is simulated.</p>
+                            <div class="overflow-x-auto">
+                                <table id="invoice-table" class="min-w-full divide-y divide-gray-200 hidden">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate (Rs.)</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount (Rs.)</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Booking ID</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="invoice-body" class="bg-white divide-y divide-gray-200">
+                                    </tbody>
+                                    <tfoot class="bg-gray-50 font-semibold">
+                                        <tr>
+                                            <td class="px-6 py-4 text-left">Total</td>
+                                            <td id="invoice-total-qty" class="px-6 py-4 text-left"></td>
+                                            <td class="px-6 py-4"></td>
+                                            <td id="invoice-total-amount" class="px-6 py-4 text-left"></td>
+                                            <td class="px-6 py-4"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div class="card">
+                            <h3 class="text-2xl font-semibold mb-4">Live Booking Ledger (FIFO Layers)</h3>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Booking ID</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price (Rs.)</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Qty</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance Qty</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="booking-ledger-body" class="bg-white divide-y divide-gray-200">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3 class="text-2xl font-semibold mb-4">Booking Status Chart</h3>
+                            <div class="chart-container">
+                                <canvas id="bookingChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <section id="page-setup" class="hidden">
+                <h2 class="text-3xl font-semibold mb-4">1. System Setup & Master Data</h2>
+                <p class="text-lg text-gray-700 mb-6">This is the foundation of the system. All transactions rely on this clean, standardized data to prevent errors. You would set this up once and update it as needed.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="card">
+                        <h3 class="text-xl font-semibold mb-3 text-blue-600">Customer Master</h3>
+                        <p class="text-gray-600 mb-4">Stores all customer details. This ensures all bookings and invoices are tied to the correct account.</p>
+                        <ul class="list-disc list-inside space-y-1 text-gray-700">
+                            <li>Customer Name</li>
+                            <li>Address</li>
+                            <li>Phone Number</li>
+                            <li>Email / GSTIN</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-xl font-semibold mb-3 text-blue-600">Item Master</h3>
+                        <p class="text-gray-600 mb-4">Defines the products you sell. This standardizes item names and units across the system.</p>
+                        <ul class="list-disc list-inside space-y-1 text-gray-700">
+                            <li>Item Name (e.g., "Item 1")</li>
+                            <li>Unit of Measure (e.g., "Units", "Kgs")</li>
+                            <li>SKU / HSN Code</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-xl font-semibold mb-3 text-blue-600">Daily Rate Input</h3>
+                        <p class="text-gray-600 mb-4">An entry point for the daily floating price. This can be used as a default when creating new bargains.</p>
+                        <ul class="list-disc list-inside space-y-1 text-gray-700">
+                            <li>Date</li>
+                            <li>Item Name</li>
+                            <li>Master Price (Rs. Per Unit)</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="page-reporting" class="hidden">
+                <h2 class="text-3xl font-semibold mb-4">4. Key Reporting & Audit</h2>
+                <p class="text-lg text-gray-700 mb-6">With all data captured correctly, the system can generate instant, zero-error reports essential for business decisions and auditing.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="card">
+                        <h3 class="text-xl font-semibold mb-3 text-blue-600">Customer Position Report</h3>
+                        <p class="text-gray-600">Shows the total booked quantity, total delivered quantity, and the final **net outstanding balance** for every customer and item. This is your high-level business overview.</p>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-xl font-semibold mb-3 text-blue-600">Booking Detail Report</h3>
+                        <p class="text-gray-600">A complete list of all **Open** bookings, showing the original quantity, the remaining balance, and the price layer. This helps you see your future price commitments.</p>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-xl font-semibold mb-3 text-blue-600">Audit Trail</h3>
+                        <p class="text-gray-600">The most critical report. Every delivery transaction logs exactly which booking IDs were consumed, by how much, and what prices were applied, ensuring a clear, traceable record for all audits.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // PWA: Register the service worker to allow installation and caching
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                // IMPORTANT: The path is relative to the root of the site.
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered with scope:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.error('Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        let bookings = [];
+        let bookingChart;
+
+        const initialState = () => [
+            { id: 'B-001', date: '2025-10-25', price: 100, totalQty: 100, balanceQty: 100, status: 'Open' },
+            { id: 'B-002', date: '2025-10-26', price: 105, totalQty: 150, balanceQty: 150, status: 'Open' },
+            { id: 'B-003', date: '2025-10-27', price: 90, totalQty: 100, balanceQty: 100, status: 'Open' }
+        ];
+
+        const ledgerBody = document.getElementById('booking-ledger-body');
+        const invoiceBody = document.getElementById('invoice-body');
+        const invoiceTable = document.getElementById('invoice-table');
+        const invoicePlaceholder = document.getElementById('invoice-placeholder');
+        const totalQtyEl = document.getElementById('invoice-total-qty');
+        const totalAmountEl = document.getElementById('invoice-total-amount');
+
+        const btnDelivery1 = document.getElementById('btn-delivery-1');
+        const btnDelivery2 = document.getElementById('btn-delivery-2');
+        const btnReset = document.getElementById('btn-reset');
+
+        const navLinks = {
+            demo: document.getElementById('nav-demo'),
+            setup: document.getElementById('nav-setup'),
+            reporting: document.getElementById('nav-reporting')
+        };
+
+        const pages = {
+            demo: document.getElementById('page-demo'),
+            setup: document.getElementById('page-setup'),
+            reporting: document.getElementById('page-reporting')
+        };
+
+        function navigate(page) {
+            Object.values(pages).forEach(p => p.classList.add('hidden'));
+            Object.values(navLinks).forEach(l => l.classList.remove('active'));
+            
+            pages[page].classList.remove('hidden');
+            navLinks[page].classList.add('active');
+        }
+
+        navLinks.demo.addEventListener('click', () => navigate('demo'));
+        navLinks.setup.addEventListener('click', () => navigate('setup'));
+        navLinks.reporting.addEventListener('click', () => navigate('reporting'));
+
+        function renderTable() {
+            ledgerBody.innerHTML = '';
+            bookings.forEach(b => {
+                const row = document.createElement('tr');
+                row.className = b.status === 'Closed' ? 'bg-gray-100 text-gray-500' : 'bg-white';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${b.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${b.date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${b.price.toFixed(2)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${b.totalQty}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold ${b.balanceQty === 0 ? 'text-red-500' : 'text-green-600'}">${b.balanceQty}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${b.status === 'Open' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${b.status}
+                        </span>
+                    </td>
+                `;
+                ledgerBody.appendChild(row);
+            });
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('bookingChart').getContext('2d');
+            
+            const labels = bookings.map(b => b.id);
+            const consumedData = bookings.map(b => b.totalQty - b.balanceQty);
+            const remainingData = bookings.map(b => b.balanceQty);
+
+            if (bookingChart) {
+                bookingChart.data.labels = labels;
+                bookingChart.data.datasets[0].data = consumedData;
+                bookingChart.data.datasets[1].data = remainingData;
+                bookingChart.update();
+            } else {
+                bookingChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Consumed Qty',
+                                data: consumedData,
+                                backgroundColor: 'rgb(249, 115, 22)',
+                            },
+                            {
+                                label: 'Remaining Qty',
+                                data: remainingData,
+                                backgroundColor: 'rgb(34, 197, 94)',
+                            }
+                        ]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Booking Quantities (Consumed vs. Remaining)'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.x !== null) {
+                                            label += context.parsed.x + ' units';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                stacked: true,
+                                title: {
+                                    display: true,
+                                    text: 'Quantity'
+                                }
+                            },
+                            y: {
+                                stacked: true,
+                                title: {
+                                    display: true,
+                                    text: 'Booking ID'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        function renderInvoice(lines) {
+            if (lines.length === 0) {
+                invoiceTable.classList.add('hidden');
+                invoicePlaceholder.classList.remove('hidden');
+                return;
+            }
+
+            invoiceBody.innerHTML = '';
+            let totalQty = 0;
+            let totalAmount = 0;
+
+            lines.forEach(line => {
+                const row = document.createElement('tr');
+                const amount = line.qty * line.price;
+                totalQty += line.qty;
+                totalAmount += amount;
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">Item 1</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${line.qty}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${line.price.toFixed(2)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${amount.toFixed(2)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${line.bookingId}</td>
+                `;
+                invoiceBody.appendChild(row);
+            });
+
+            totalQtyEl.textContent = totalQty;
+            totalAmountEl.textContent = `Rs. ${totalAmount.toFixed(2)}`;
+            invoiceTable.classList.remove('hidden');
+            invoicePlaceholder.classList.add('hidden');
+        }
+
+        function processFifoDelivery(deliveryQty) {
+            let qtyToDeliver = deliveryQty;
+            const invoiceLines = [];
+
+            for (const booking of bookings) {
+                if (qtyToDeliver === 0 || booking.status === 'Closed') {
+                    continue;
+                }
+
+                const qtyFromThisBooking = Math.min(qtyToDeliver, booking.balanceQty);
+
+                if (qtyFromThisBooking > 0) {
+                    booking.balanceQty -= qtyFromThisBooking;
+                    qtyToDeliver -= qtyFromThisBooking;
+
+                    if (booking.balanceQty === 0) {
+                        booking.status = 'Closed';
+                    }
+                    
+                    invoiceLines.push({
+                        bookingId: booking.id,
+                        qty: qtyFromThisBooking,
+                        price: booking.price
+                    });
+                }
+            }
+            
+            renderTable();
+            renderChart();
+            renderInvoice(invoiceLines);
+        }
+
+        function reset() {
+            bookings = initialState();
+            renderTable();
+            renderChart();
+            renderInvoice([]);
+            btnDelivery1.disabled = false;
+            btnDelivery2.disabled = true;
+            navigate('demo');
+        }
+
+        btnDelivery1.addEventListener('click', () => {
+            processFifoDelivery(50);
+            btnDelivery1.disabled = true;
+            btnDelivery2.disabled = false;
+        });
+
+        btnDelivery2.addEventListener('click', () => {
+            processFifoDelivery(150);
+            btnDelivery2.disabled = true;
+        });
+        
+        btnReset.addEventListener('click', reset);
+
+        reset();
+    </script>
+</body>
+</html>
